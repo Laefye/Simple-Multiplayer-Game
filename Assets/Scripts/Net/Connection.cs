@@ -61,6 +61,13 @@ namespace Net
             if (_disposed || packet == null)
                 return false;
                 
+            // Validate packet size
+            if (!NetworkValidator.IsValidPacketSize(packet.Length))
+            {
+                Debug.LogWarning($"Packet too large ({packet.Length} bytes), rejecting send");
+                return false;
+            }
+                
             try
             {
                 _socket.Send(packet.GetBytes());

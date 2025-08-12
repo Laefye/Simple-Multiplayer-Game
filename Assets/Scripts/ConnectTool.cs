@@ -56,9 +56,11 @@ public class ConnectTool : MonoBehaviour
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(username.text))
+            // Validate and sanitize username
+            string sanitizedUsername = NetworkValidator.SanitizeUsername(username.text);
+            if (!NetworkValidator.IsValidUsername(sanitizedUsername))
             {
-                Debug.LogError("Username cannot be empty");
+                Debug.LogError("Invalid username provided");
                 return;
             }
             
@@ -70,7 +72,9 @@ public class ConnectTool : MonoBehaviour
             
             _networkManager.Client.Register(ClientShadowPlayer.Channel, new ClientShadowPlayer());
             _networkManager.Client.Register(ClientShadowPlayerDisconnect.Channel, new ClientShadowPlayerDisconnect());
-            _networkManager.Client.Connect(IPAddress.Parse(ip.text), username.text.Trim());
+            _networkManager.Client.Connect(IPAddress.Parse(ip.text), sanitizedUsername);
+            
+            Debug.Log($"Attempting to connect to {ip.text} as '{sanitizedUsername}'");
         }
         catch (FormatException)
         {

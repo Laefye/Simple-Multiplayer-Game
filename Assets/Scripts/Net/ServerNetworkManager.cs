@@ -134,6 +134,16 @@ namespace Net
                 }
                 
                 var username = clientInit.Reader.ReadString();
+                
+                // Validate and sanitize username
+                if (!NetworkValidator.IsValidUsername(username))
+                {
+                    Debug.LogWarning($"Invalid username received: '{username}', closing connection");
+                    client.Dispose();
+                    return;
+                }
+                
+                username = NetworkValidator.SanitizeUsername(username);
 
                 var guid = Guid.NewGuid();
                 var serverInit = Packet.Empty();
@@ -152,6 +162,8 @@ namespace Net
                         NetworkConstants.DefaultSpawnRotation, guid, username);
                     var serverPlayer = player.GetComponent<ServerPlayer>();
                     serverPlayer.Connection = client;
+                    
+                    Debug.Log($"Player '{username}' connected with ID: {guid}");
                     
                     new Thread(() => ClientThread(serverPlayer)).Start();
                 });
@@ -193,7 +205,7 @@ namespace Net
                         {
                             continue;
                         }
-                        pl.Send(ClientShadowPlayerDisconnect.Channel, packet);
+                        pl.Send(NetworkConstants.Channels.ShadowPlayerDisconnect, packet);
                     }
                     UnityEngine.Object.Destroy(player.gameObject);
                 });
