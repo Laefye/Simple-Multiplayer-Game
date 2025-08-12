@@ -1,34 +1,77 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
-using System.Net.Sockets;
-using System.Threading;
+using System.Collections.Concurrent;
 using UnityEngine;
 
 namespace Net
 {
+    /// <summary>
+    /// Central manager for networking operations, handling both client and server functionality
+    /// </summary>
     public class NetworkManager : MonoBehaviour
     {
+        /// <summary>
+        /// Client network manager instance
+        /// </summary>
         public readonly ClientNetworkManager Client = new ClientNetworkManager();
+        
+        /// <summary>
+        /// Server network manager instance
+        /// </summary>
         public readonly ServerNetworkManager Server = new ServerNetworkManager();
-        private static readonly Stack<Action<NetworkManager>> Actions = new Stack<Action<NetworkManager>>();
-        public GameObject clientPlayer;
-        public GameObject serverPlayer;
-        public GameObject shadowPlayer;
+        
+        // Thread-safe queue for actions that need to run on the main thread
+        private static readonly ConcurrentQueue<Action<NetworkManager>> Actions = new ConcurrentQueue<Action<NetworkManager>>();
+        
+        [Header("Player Prefabs")]
+        [SerializeField] public GameObject clientPlayer;
+        [SerializeField] public GameObject serverPlayer;
+        [SerializeField] public GameObject shadowPlayer;
 
+        /// <summary>
+        /// Process queued actions on the main thread
+        /// </summary>
         public void FixedUpdate()
         {
-            while (Actions.Count > 0)
+            // Process all queued actions
+            while (Actions.TryDequeue(out var action))
             {
-                Actions.Pop().Invoke(this);
+                try
+                {
+                    action.Invoke(this);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Error executing network action: {ex.Message}");
+                }
             }
         }
 
+        /// <summary>
+        /// Queues an action to be executed on the main thread during the next FixedUpdate
+        /// </summary>
+        /// <param name="action">Action to execute on the main thread</param>
         public static void Execute(Action<NetworkManager> action)
         {
-            Actions.Push(action);
+            if (action != null)
+            {
+                Actions.Enqueue(action);
+            }
+        }
+
+        /// <summary>
+        /// Clean up networking resources when the manager is destroyed
+        /// </summary>
+        private void OnDestroy()
+        {
+            try
+            {
+                Client?.Disconnect();
+                Server?.Stop();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Error during NetworkManager cleanup: {ex.Message}");
+            }
         }
     }
 }
